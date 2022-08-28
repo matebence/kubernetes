@@ -170,6 +170,7 @@ cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
 net.bridge.bridge-nf-call-ip6tables = 1
 net.bridge.bridge-nf-call-iptables = 1
 EOF
+
 sudo sysctl --system
 ```
 
@@ -292,6 +293,9 @@ kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml
 ## Join Worker Nodes To Kubernetes Master Node (example)
 
 ```bash
+sudo rm /etc/containerd/config.toml
+sudo systemctl restart containerd
+
 sudo kubeadm join 10.0.0.10:6443 --token 8s6mcn.vvau2di3348o7j1n --discovery-token-ca-cert-hash sha256:41a332b1bed6bf02a3b05ab037a64db74715c0e254489549f38e11e2926d8189 
 ```
 
@@ -320,8 +324,28 @@ kubectl edit deploy -n kube-system metrics-server
 ## Setup Kubernetes dashboard
 
 ```bash
-kubectl apply -f 
-https://raw.githubusercontent.com/kubernetes/dashboard/v2.3.1/aio/deploy/recommended.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.3.1/aio/deploy/recommended.yaml
+```
+
+### Creating a Service for Kubernetes dashboard
+
+```yaml
+kind: Service
+apiVersion: v1
+metadata:
+  namespace: kubernetes-dashboard
+  name: kubernetes-dashboard-service-np
+  labels:
+    k8s-app: kubernetes-dashboard
+spec:
+  type: NodePort
+  ports:
+  - port: 8443
+    nodePort: 30002
+    targetPort: 8443
+    protocol: TCP
+  selector:
+    k8s-app: kubernetes-dashboard
 ```
 
 ### Creating a Service Account
@@ -355,4 +379,133 @@ subjects:
 
 ```yaml
 kubectl -n kubernetes-dashboard create token admin-user
+```
+
+```bash
+ firefox https://10.0.0.10:30002/#/login
+```
+
+![Kubernetes](https://raw.githubusercontent.com/matebence/kubernetes/master/kubernetes.png)
+
+## Terminology
+
+- Cluster - A set of Node machines which are running the Containrized Application(Worker Nodes) or control other nodes (Master node)
+- Nodes - physical or virtual machine with a certain hardware capacity which hosts one or multiple pods and communicate with the cluster
+  - Master node - Cluster Control Plane, managing the Prods across worker nodes
+  - Worker node - Host, Pods running App Containers
+- Pods - Pods hold the actual running app containers + their required resources
+- Containers - Normal Docker containers
+- Services - Exposes Pods to the cluster or externally to the outside word
+
+## Kubernetes has the following components
+
+API server
+  Act as a frontend for the users
+  Every one talks to the api server 
+etcd
+  Its a key value store
+  For storing information about the nodes
+kubelet
+  Is an agent that run on each nodes
+  the agent make sure the containers are running on nodes as excepted
+Container Runtime
+  It is used to run container in our case is docer
+Controller
+  It make desicition to scale container or restart them
+Scheduler
+  It distributes the work
+  It assigned container to the nodes
+
+## Worker node
+
+- Pods are created and managed by Kubernetes (Master node) and placed on the Worker nodes
+- A pod hosts one or more application containers and their resources (volumes, IP, run config)
+- On the worker node we have to have installed
+  - docker - for managing containers
+  - kubelet - communication between Master and worker node
+  - kube-proxy (core dns) - for network communication
+
+## Master node
+
+- The most importat service on the master node is the API Server
+  - API for the kubelets to communicate
+- Scheduler
+  - Watches for new Pods, select Worker nodes to run them on
+- Kube-Controller-Manager 
+  - Watches and controls worker nodes, correct nubmer of pods and more
+- Cloud-Controller-Manager
+  - Like Kube-Controller-Manager but for speicifc Cloud Provider: Knows how to interact with cloud provider resources
+- Etcd 
+  - key value store
+
+## Kubernetes Objects
+
+Kubernetes is working with Objects like pods, deployments, services, replicasets etc ... The 3 most important are:
+
+### Pod
+
+Contains and runs one or more multiple containers
+Has a cluster internal IP by default = for communication
+Containers inside a Pod can communicate via localhost
+
+### Deployment
+
+- Controls multiple Pods
+- Deployments can be paused, deleted and rolled back
+- Deployment can be scaled dynamically (and automatically)
+
+### Services
+
+- --type=ClusterIP - default accesible only inside from the cluster
+- --type=NodePort - it will be exposed via the worker node ip, and it will be accesible from outside
+- --type=LoadBalancer - the loadbalancer will generate a unique address and it will evenly distribute all the traffi
+
+### Object creation
+
+- Imperatively - command
+- Declaratively - .yml files
+
+```bash
+##creating deployment
+kubectl create deployment my-app --image=nginx:latest
+
+## creating service
+kubectl expose deployment/my-app --type=NodePort --port=80
+
+## expose to host via minikube
+minikube service my-app
+
+
+
+## remove deployment
+kubectl delete deployment/my-app
+
+## remove service
+kubectl delete service/my-app
+
+## remove pod
+kubectl delete pod/my-app-sd789qw3
+
+
+
+## get informations
+kubectl get pods
+kubectl get services
+kubectl get deployments
+kubectl describe deployment/my-app
+kubectl exec -it my-app -- bash
+
+
+
+## set replicas
+kubectl scale deployment/firstapp --replicas=3
+
+## changing image, no additional update needed
+kubectl set image deployment/my-app nginx=nginx:perl
+
+## update if the tag is always latest
+kubectl rollout restart deployment/my-app
+
+## check the update status
+kubectl rollout status deployment/my-app
 ```
