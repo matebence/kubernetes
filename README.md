@@ -465,6 +465,8 @@ Containers inside a Pod can communicate via localhost
 - Imperatively - command
 - Declaratively - .yml files
 
+## The basics - imperatively approach
+
 ```bash
 ##creating deployment
 kubectl create deployment my-app --image=nginx:latest
@@ -493,7 +495,7 @@ kubectl get pods
 kubectl get services
 kubectl get deployments
 kubectl describe deployment/my-app
-kubectl exec -it my-app -- bash
+kubectl exec -it pod/my-app -- bash
 
 
 
@@ -503,9 +505,174 @@ kubectl scale deployment/firstapp --replicas=3
 ## changing image, no additional update needed
 kubectl set image deployment/my-app nginx=nginx:perl
 
+## show deployment history
+kubectl rollout history deployment/my-app
+
+## show detailed deployment history
+kubectl rollout history deployment/my-app --revision=1
+
+## rollback last deployment
+kubectl rollout undo deployment/my-app
+
+## rollback to specific deployment
+kubectl rollout undo deployment/my-app --to-revision=2
+
 ## update if the tag is always latest
 kubectl rollout restart deployment/my-app
 
 ## check the update status
 kubectl rollout status deployment/my-app
+```
+
+## The basics - declaratively approach
+
+```yaml
+# YAML explained
+key: value
+
+propertyOne: propertyOneValue
+propertyTwo: propertyTwoValue
+propertyThree:
+	anotherDictionary: anotherDictionaryValue
+
+arrayOfElements:
+	- first-element
+	- second-element
+
+arrayOfDictionaries
+	- name: testName
+	  value: testValue
+	  descrption: testDescription
+```
+
+```bash
+### for all opearions like CRUD
+kubectl create -f deployment.yaml
+kubectl apply -f deployment.yaml -f service.yaml
+kubectl delete -f deployment.yaml
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+```
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: my-app
+  ports:
+    - protocol: 'TCP'
+      port: 123
+      targetPort: 80
+			nodePort: 32000
+  type: NodePort
+```
+
+### Merging config files via '---'
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: my-app
+  ports:
+    - protocol: 'TCP'
+      port: 123
+      targetPort: 80
+      nodePort: 30200
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+```
+
+### Selectors via expressions
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchExpressions:
+      - {key: app, operator: In, values: [my-app]}
+      - {key: app, operator: NotIn, values: [first-app, second-app]}
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+```
+
+### Additional configurations (LivenessProbe and ImagePull Policy)
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchExpressions:
+      - {key: app, operator: In, values: [my-app]}
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+		  imagePullPolicy: Always
+		  livenessProbe:
+		  	httpGet:
+		  		path / 						
+		  		port: 8080 					
+		  		httpHeaders: Authorization 	
+		  	periodSeconds: 10
+		  	intialDelaySeconds: 5
 ```
