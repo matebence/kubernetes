@@ -454,11 +454,40 @@ Containers inside a Pod can communicate via localhost
 - Deployments can be paused, deleted and rolled back
 - Deployment can be scaled dynamically (and automatically)
 
-### Services
+### Services (Networking)
 
 - --type=ClusterIP - default accesible only inside from the cluster
 - --type=NodePort - it will be exposed via the worker node ip, and it will be accesible from outside
 - --type=LoadBalancer - the loadbalancer will generate a unique address and it will evenly distribute all the traffi
+
+In pods where we have multiple containers we can use:
+- http://localhost
+
+For pod to pod communication we have two options
+- env: [SERVICE_NAME]_SERVICE_HOST
+- Code DNS: http//service-name.namespace
+
+### Volumes
+
+Kubernetes can mount Volumes into Containers. Broad variety of Volumes types (NFS, EFS, CSI):
+- Local volumes (on worker nodes)
+- Cloud-provider specific Volumes
+
+**Normal Volumes**
+- Volume is attached to Pod and Pod lifecycle
+- If pod removed volumes removed too  (depending in type)
+- Defined and created together with Pods
+- Repetitive ad hard to administer on a global level
+
+**Persistent volumes**
+- Volume is a standalone Clister resource (NOT ATTACHACHED TO A POD)
+- Created standalone claimed via a PVC
+- Can be defined once and used multiple times
+
+**Access modes**
+- ReadWriteOnce - it can be used by multiple pods but the node must be the same
+- ReadOnlyMany - it is read only by multiple pods on many nodes
+- ReadWriteMany - its be used by multiple pods and many nodes
 
 ### Object creation
 
@@ -675,4 +704,151 @@ spec:
 		  		httpHeaders: Authorization 	
 		  	periodSeconds: 10
 		  	intialDelaySeconds: 5
+```
+
+### Setting environment variables
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          env:
+            - name: test
+              value: 'test'
+```
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config-map
+data:
+  myKey: myValue
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          env:
+            - name: test
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config-map
+                  key: myKey
+```
+
+### Setting normal pod volumes (emptyDir & hostPaths)
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          volumeMounts:
+            - mountPath: /app/data
+              name: my-mount
+      volumes:
+        - name: my-mount
+          emptyDir: {}
+        - name: second-mount
+          hostPath:
+            path: /data
+            type: DirectoryOrCreate
+```
+
+### Setting persistent volumes
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: my-pv
+spec:
+  capacity:
+   storage: 1Gi
+  volumeMode: Filesystem
+  storageClassName: standard
+  accessModes:
+   - ReadWriteOnce      
+  hostPath:
+    path: /data
+    type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-pvc
+spec:
+  volumeName: my-pv       
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 1Gi  
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          volumeMounts:
+            - mountPath: /app/data
+              name: my-mount
+      volumes:
+        - name: my-mount
+          persistentVolumeClaim:
+            claimName: my-pvc
 ```
