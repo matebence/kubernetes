@@ -454,11 +454,39 @@ Containers inside a Pod can communicate via localhost
 - Deployments can be paused, deleted and rolled back
 - Deployment can be scaled dynamically (and automatically)
 
+Strategies:
+- recreate - A deployment defined with a strategy of type Recreate will terminate all the running instances then recreate them with the newer version
+- ramped (rolling update) - A ramped deployment updates pods in a rolling update fashion, a secondary ReplicaSet is created with the new version of the application, then the number of replicas of the old version is decreased and the new version is increased until the correct number of replicas is reached.
+
+### Kubernetes controllers
+
+- They monitor kubernetes objects
+- Replication controller supports the high avaibility
+  - For scaling our pods and restarting on failure
+
+There are two terms:
+- Replication Controller 
+  - Its the older technology
+  - And replaced by 'Replica set'
+- Replica set
+  - Its the new recommended way to setup replication
+
+- Lets say you use ReplicaSet-A for controlling your pods, then You wish to update your pods to a newer version, now you should create Replicaset-B, scale down ReplicaSet-A and scale up ReplicaSet-B by one step repeatedly (This process is known as rolling update). Although this does the job, but it's not a good practice and it's better to let K8S do the job.
+
+- A Deployment resource does this automatically without any human interaction and increases the abstraction by one level.
+
 ### Services (Networking)
 
-- --type=ClusterIP - default accesible only inside from the cluster
-- --type=NodePort - it will be exposed via the worker node ip, and it will be accesible from outside
-- --type=LoadBalancer - the loadbalancer will generate a unique address and it will evenly distribute all the traffi
+- **--type=ClusterIP** 
+  - default, accesible only inside from the cluster
+- **--type=NodePort** 
+  - it will be exposed via the worker node ip, and it will be accesible from outside 
+  - this is also loadbalanced
+  - 30000-32767
+- **--type=LoadBalancer** 
+  - the loadbalancer will generate a unique address and it will evenly distribute all the traffic
+
+![Services](https://raw.githubusercontent.com/matebence/kubernetes/master/services.png)
 
 In pods where we have multiple containers we can use:
 - http://localhost
@@ -500,57 +528,81 @@ Kubernetes can mount Volumes into Containers. Broad variety of Volumes types (NF
 ##creating deployment
 kubectl create deployment my-app --image=nginx:latest
 
+##creating pod
+kubectl run my-app --image=nginx:latest
+
 ## creating service
-kubectl expose deployment/my-app --type=NodePort --port=80
+kubectl expose deployment my-app --type=NodePort --port=80
 
 ## expose to host via minikube
 minikube service my-app
 
 
+## remove pod
+kubectl delete pod my-app
 
 ## remove deployment
-kubectl delete deployment/my-app
+kubectl delete deployment my-app
 
 ## remove service
-kubectl delete service/my-app
+kubectl delete service my-app
 
 ## remove pod
-kubectl delete pod/my-app-sd789qw3
+kubectl delete pod my-app-sd789qw3
+
+
+
+## converting imperative to declarative (deployment, pod etc ...)
+kubectl create deployment my-app --image=nginx:latest --dry-run=client -o yaml > my-app-deployment.yaml
 
 
 
 ## get informations
+kubectl get all
 kubectl get pods
+kubectl get pods -o wide
 kubectl get services
 kubectl get deployments
-kubectl describe deployment/my-app
-kubectl exec -it pod/my-app -- bash
+kubectl get configmaps
+kubectl get persistentVolumes
+kubectl get persistentVolumeClaims
+kubectl get replicasets
+kubectl describe deployment my-app
+kubectl exec -it pod my-app -- bash
+kubectl exec pod my-app -- env
+
+
+
+## editing existing resources (deployment, pod etc ...)
+## if we change the image it will be pulled
+kubectl edit deployment my-app
 
 
 
 ## set replicas
-kubectl scale deployment/firstapp --replicas=3
+kubectl scale deployment firstapp --replicas=3
 
 ## changing image, no additional update needed
-kubectl set image deployment/my-app nginx=nginx:perl
+## it will automatically pull the image
+kubectl set image deployment my-app nginx=nginx:perl
 
 ## show deployment history
-kubectl rollout history deployment/my-app
+kubectl rollout history deployment my-app
 
 ## show detailed deployment history
-kubectl rollout history deployment/my-app --revision=1
+kubectl rollout history deployment my-app --revision=1
 
 ## rollback last deployment
-kubectl rollout undo deployment/my-app
+kubectl rollout undo deployment my-app
 
 ## rollback to specific deployment
-kubectl rollout undo deployment/my-app --to-revision=2
+kubectl rollout undo deployment my-app --to-revision=2
 
 ## update if the tag is always latest
-kubectl rollout restart deployment/my-app
+kubectl rollout restart deployment my-app
 
 ## check the update status
-kubectl rollout status deployment/my-app
+kubectl rollout status deployment my-app
 ```
 
 ## The basics - declaratively approach
@@ -581,6 +633,8 @@ kubectl apply -f deployment.yaml -f service.yaml
 kubectl delete -f deployment.yaml
 ```
 
+### Deployment creation
+
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -601,6 +655,29 @@ spec:
           image: nginx:latest
 ```
 
+**Recreate**
+
+```yaml
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate
+```
+
+**Ramped**
+```yaml
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2        # how many pods we can add at a time
+      maxUnavailable: 0  # maxUnavailable define how many pods can be unavailable
+                         # during the rolling update
+```
+
+### Service creation
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -608,13 +685,66 @@ metadata:
   name: backend
 spec:
   selector:
-    app: my-app
+    app: rest-api
   ports:
-    - protocol: 'TCP'
-      port: 123
+    - port: 40
+      targetPort: 40
+  type: ClusterIP
+```
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  selector:
+    app: spa
+  ports:
+    - protocol: TCP
+      port: 80
       targetPort: 80
-			nodePort: 32000
+      nodePort: 30200
   type: NodePort
+```
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  selector:
+    app: pwa
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
+```
+
+**API versioning with service selectors**
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+ name: my-app
+ labels:
+   app: my-app
+spec:
+ type: NodePort
+ ports:
+ - name: http
+   port: 8080
+   targetPort: 8080
+
+ # Note here that we match both the app and the version.
+ # When switching traffic, we update the label “version” with
+ # the appropriate value, ie: v2.0.0
+ selector:
+   app: my-app
+   version: v1.0.0
 ```
 
 ### Merging config files via '---'
@@ -677,6 +807,8 @@ spec:
 ```
 
 ### Additional configurations (LivenessProbe and ImagePull Policy)
+
+- on any change the image will be repulled
 
 ```yaml
 apiVersion: apps/v1
@@ -851,4 +983,26 @@ spec:
         - name: my-mount
           persistentVolumeClaim:
             claimName: my-pvc
+```
+
+### Setting replicate set
+
+```yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: myapp-replicaset
+spec: 
+  selector: 
+    matchLabels:
+      app: my-app
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
 ```
