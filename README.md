@@ -399,22 +399,32 @@ kubectl -n kubernetes-dashboard create token admin-user
 
 ## Kubernetes has the following components
 
-API server
-  Act as a frontend for the users
-  Every one talks to the api server 
-etcd
-  Its a key value store
-  For storing information about the nodes
-kubelet
-  Is an agent that run on each nodes
-  the agent make sure the containers are running on nodes as excepted
-Container Runtime
-  It is used to run container in our case is docer
-Controller
-  It make desicition to scale container or restart them
-Scheduler
-  It distributes the work
-  It assigned container to the nodes
+- API server
+	- Act as a frontend for the users
+ 	- Everyone talks to the api server 
+ 	- curl -X POST /api/v1/namespaces/default/pods
+- etcd
+	- Its a key value store
+	- For storing information about the nodes
+- kubelet
+	- The agent make sure the containers are running on nodes as excepted
+	- They listen for action and send back information to the master node
+- Container Runtime
+	- It is used to run container in our case is docer
+	- docker, contaierd, rocket
+- Controller
+	- Replication controller
+		- It make desicition to scale container or restart them
+	- Node controller
+		- Watches the nodes (heartbeat)
+- Scheduler
+	- It distributes the work
+	- It assignes container to the nodes
+	- Which pods goes on which node
+- Kube-proxy
+	- Container to container communication
+	- Its job is to look for new services and everytime a new  service is created it creates the appropriate rules on each node to forward the traffic to services
+
 
 ## Worker node
 
@@ -531,6 +541,9 @@ kubectl create deployment my-app --image=nginx:latest
 ##creating pod
 kubectl run my-app --image=nginx:latest
 
+## creating namespace
+kubectl create namespace dev
+
 ## creating service
 kubectl expose deployment my-app --type=NodePort --port=80
 
@@ -543,6 +556,9 @@ kubectl delete pod my-app
 
 ## remove deployment
 kubectl delete deployment my-app
+
+## remove namespace
+kubectl delete namespace dev
 
 ## remove service
 kubectl delete service my-app
@@ -567,9 +583,22 @@ kubectl get configmaps
 kubectl get persistentVolumes
 kubectl get persistentVolumeClaims
 kubectl get replicasets
+kubectl get namespaces
+kubectl get resourcequotas
 kubectl describe deployment my-app
-kubectl exec -it pod my-app -- bash
-kubectl exec pod my-app -- env
+kubectl exec -it my-app -- bash
+kubectl exec my-app -- env
+
+
+
+## filter based on namespaces
+kubectl -n your-namespace get pods
+kubectl get pods --all-namespaces
+
+
+
+## set default namespace
+kubectl config set-context $(kubectl config current-context) --namespace=dev
 
 
 
@@ -1005,4 +1034,45 @@ spec:
       containers:
         - name: nginx
           image: nginx:latest
+```
+
+### Namespaces
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  namespace: dev
+  labels:
+    app: myapp
+    type: front-end
+spec:
+  containers:
+    - name: nginx-container
+      image: nginx
+```
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+  labels:
+    name: dev
+```
+
+```yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute-quata
+  namespace: dev
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    requests.nvidia.com/gpu: 4
 ```
