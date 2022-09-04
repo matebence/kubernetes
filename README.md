@@ -562,16 +562,16 @@ key: value
 propertyOne: propertyOneValue
 propertyTwo: propertyTwoValue
 propertyThree:
-	anotherDictionary: anotherDictionaryValue
+  anotherDictionary: anotherDictionaryValue
 
 arrayOfElements:
-	- first-element
-	- second-element
+  - first-element
+  - second-element
 
 arrayOfDictionaries
-	- name: testName
-	  value: testValue
-	  descrption: testDescription
+  - name: testName
+    value: testValue
+    descrption: testDescription
 ```
 
 ```bash
@@ -696,14 +696,14 @@ spec:
       containers:
         - name: nginx
           image: nginx:latest
-		  imagePullPolicy: Always
-		  livenessProbe:
-		  	httpGet:
-		  		path / 						
-		  		port: 8080 					
-		  		httpHeaders: Authorization 	
-		  	periodSeconds: 10
-		  	intialDelaySeconds: 5
+      imagePullPolicy: Always
+      livenessProbe:
+        httpGet:
+          path / 						
+          port: 8080 					
+          httpHeaders: Authorization 	
+        periodSeconds: 10
+        intialDelaySeconds: 5
 ```
 
 ### Setting environment variables
