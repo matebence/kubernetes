@@ -506,9 +506,9 @@ Kubernetes can mount Volumes into Containers. Broad variety of Volumes types (NF
 
 Tolerations does not tell the pod to go to a particular node. Instead it tells the node to accept pod with certain tolerations.
 
-**NoeSchedule** - The pod will not be scheduled on the node
-**PreferNoSchedule** - It will try not to schedule a pod on the node, but its not guaranteed
-**NoExecute** - New pods will not be scheduled on the node and the existing pods will be evicted(removed and not recreated on other nodes) if they dont tolerait the taint
+- **NoeSchedule** - The pod will not be scheduled on the node
+- **PreferNoSchedule** - It will try not to schedule a pod on the node, but its not guaranteed
+- **NoExecute** - New pods will not be scheduled on the node and the existing pods will be evicted(removed and not recreated on other nodes) if they dont tolerait the taint
 
 ### Affinity
 	
@@ -516,9 +516,9 @@ Two types of Affinity types
 - During scheduling means it is created the first time
 - During execution means means that if the label is removed from the node the pods are going to ignore it
 
-**requiredDuringSchedulingIgnoredDuringExecution** - If there is no label on the node what could match then the pod is not created
-**preferredDuringSchedulingIgnoredDuringExecution** - If there is no label on the node what could match then the pod is created, but on diff node
-**requiredDuringSchedulingRequiredDuringExecution** - If there is no label on the node what could match then the pod is not created and if the label is removed from the node the pods gets destroyed
+- **requiredDuringSchedulingIgnoredDuringExecution** - If there is no label on the node what could match then the pod is not created
+- **preferredDuringSchedulingIgnoredDuringExecution** - If there is no label on the node what could match then the pod is created, but on diff node
+- **requiredDuringSchedulingRequiredDuringExecution** - If there is no label on the node what could match then the pod is not created and if the label is removed from the node the pods gets destroyed
 
 ### Static pods
 
