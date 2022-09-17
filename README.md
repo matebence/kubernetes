@@ -1330,7 +1330,7 @@ spec:
 cat cert.yaml | envsubst | kubectl apply -f -
 ```
 
-```yaml
+```bash
 kubectl get csr
 kubectl certificate approve bence
 kubectl get csr bence -o yaml
