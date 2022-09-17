@@ -613,7 +613,7 @@ spec:
     - protocol: 'TCP'
       port: 123
       targetPort: 80
-			nodePort: 32000
+      nodePort: 32000
   type: NodePort
 ```
 
