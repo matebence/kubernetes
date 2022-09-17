@@ -1,4 +1,3 @@
-
 # Kubernetes
 
 ## Installing Google Chrome
@@ -348,39 +347,6 @@ spec:
     k8s-app: kubernetes-dashboard
 ```
 
-### Creating a Service Account
-
-```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: admin-user
-  namespace: kubernetes-dashboard
-```
-
-### Creating a ClusterRoleBinding
-
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: admin-user
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
-subjects:
-- kind: ServiceAccount
-  name: admin-user
-  namespace: kubernetes-dashboard
-```
-
-### Getting a Bearer Token
-
-```yaml
-kubectl -n kubernetes-dashboard create token admin-user
-```
-
 ```bash
  firefox https://10.0.0.10:30002/#/login
 ```
@@ -481,6 +447,15 @@ There are two terms:
 - Replica set
   - Its the new recommended way to setup replication
 
+**DaemonSets**
+
+- Its similar to replication set
+- It helps to deploy multiple instances of pods 
+- But it runs one copy on each node on the cluster 
+- If new node added then the pod gets created there
+- If the node is removed then the pod is removed
+- It good for Monitoring and logs solution 
+
 - Lets say you use ReplicaSet-A for controlling your pods, then You wish to update your pods to a newer version, now you should create Replicaset-B, scale down ReplicaSet-A and scale up ReplicaSet-B by one step repeatedly (This process is known as rolling update). Although this does the job, but it's not a good practice and it's better to let K8S do the job.
 
 - A Deployment resource does this automatically without any human interaction and increases the abstraction by one level.
@@ -526,6 +501,42 @@ Kubernetes can mount Volumes into Containers. Broad variety of Volumes types (NF
 - ReadWriteOnce - it can be used by multiple pods but the node must be the same
 - ReadOnlyMany - it is read only by multiple pods on many nodes
 - ReadWriteMany - its be used by multiple pods and many nodes
+
+### Taints & Tolerations
+
+Tolerations does not tell the pod to go to a particular node. Instead it tells the node to accept pod with certain tolerations.
+
+**NoeSchedule** - The pod will not be scheduled on the node
+**PreferNoSchedule** - It will try not to schedule a pod on the node, but its not guaranteed
+**NoExecute** - New pods will not be scheduled on the node and the existing pods will be evicted(removed and not recreated on other nodes) if they dont tolerait the taint
+
+### Affinity
+	
+Two types of Affinity types
+- During scheduling means it is created the first time
+- During execution means means that if the label is removed from the node the pods are going to ignore it
+
+**requiredDuringSchedulingIgnoredDuringExecution** - If there is no label on the node what could match then the pod is not created
+**preferredDuringSchedulingIgnoredDuringExecution** - If there is no label on the node what could match then the pod is created, but on diff node
+**requiredDuringSchedulingRequiredDuringExecution** - If there is no label on the node what could match then the pod is not created and if the label is removed from the node the pods gets destroyed
+
+### Static pods
+
+```bash
+ps -ef | grep kubelet
+grep -i static /var/lib/kubelet/config.yaml
+cd /etc/kubernetes/manifests
+```
+
+if we places pod.yaml files in this direcotry pods are going to be created by the kubelet without kube-apisever and when we delete the file it gets automatically deleted (only pods)
+
+### [Multi-Container PODs](https://betterprogramming.pub/understanding-kubernetes-multi-container-pod-patterns-577f74690aee)
+
+Patterns for multi container pods:
+- [InitContainers](https://medium.com/bb-tutorials-and-thoughts/kubernetes-learn-init-container-pattern-7a757742de6b) - In Kubernetes, an init container is the one that starts and executes before other containers in the same Pod. It's meant to perform initialization logic for the main application hosted on the Pod. For example, create the necessary user accounts, perform database migrations, create database schemas and so on.
+- **Ambassador** - The ambassador pattern derives its name from an Ambassador, who is an envoy and a person a country chooses to represent their country and connect with the rest of the world. Similarly, in the Kubernetes perspective, an Ambassador pattern implements a proxy to the external world
+- **Adapter** - The Adapter is another pattern that you can implement with multiple containers. The adapter pattern helps you standardise something heterogeneous in nature. For example, you’re running multiple applications within separate containers, but every application has a different way of outputting log files.
+- **Sidecar** - Sidecars derive their name from motorcycle sidecars. While your motorcycle can work fine without the sidecar, having one enhances or extends the functionality of your bike, by giving it an extra seat. Similarly, in Kubernetes, a sidecar pattern is used to enhance or extend the existing functionality of the container.
 
 ### Object creation
 
@@ -591,9 +602,22 @@ kubectl exec my-app -- env
 
 
 
+## get logs (for more information we install metrics server or prometheus)
+kubectl logs -f myapp
+kubectl logs myapp
+
+
+
 ## filter based on namespaces
 kubectl -n your-namespace get pods
 kubectl get pods --all-namespaces
+
+
+
+## filter based on labels
+kubectl get pods --show-labels
+kubectl get pods -l env=dev
+kubectl get pods -l env=dev,bu=finance
 
 
 
@@ -632,6 +656,11 @@ kubectl rollout restart deployment my-app
 
 ## check the update status
 kubectl rollout status deployment my-app
+
+
+
+## backup .yml files
+kubectl get all --all-namespaces -o yaml > all-deploy-services
 ```
 
 ## The basics - declaratively approach
@@ -660,6 +689,22 @@ arrayOfDictionaries
 kubectl create -f deployment.yaml
 kubectl apply -f deployment.yaml -f service.yaml
 kubectl delete -f deployment.yaml
+```
+
+### Pod creation
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+    type: front-end
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
 ```
 
 ### Deployment creation
@@ -776,98 +821,7 @@ spec:
    version: v1.0.0
 ```
 
-### Merging config files via '---'
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: backend
-spec:
-  selector:
-    app: my-app
-  ports:
-    - protocol: 'TCP'
-      port: 123
-      targetPort: 80
-      nodePort: 30200
-  type: NodePort
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: my-app
-spec:
-  selector:
-    matchLabels:
-      app: my-app
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: my-app
-    spec:
-      containers:
-        - name: nginx
-          image: nginx:latest
-```
-
-### Selectors via expressions
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: my-app
-spec:
-  selector:
-    matchExpressions:
-      - {key: app, operator: In, values: [my-app]}
-      - {key: app, operator: NotIn, values: [first-app, second-app]}
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: my-app
-    spec:
-      containers:
-        - name: nginx
-          image: nginx:latest
-```
-
-### Additional configurations (LivenessProbe and ImagePull Policy)
-
-- on any change the image will be repulled
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: my-app
-spec:
-  selector:
-    matchExpressions:
-      - {key: app, operator: In, values: [my-app]}
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: my-app
-    spec:
-      containers:
-        - name: nginx
-          image: nginx:latest
-      imagePullPolicy: Always
-      livenessProbe:
-        httpGet:
-          path / 						
-          port: 8080 					
-          httpHeaders: Authorization 	
-        periodSeconds: 10
-        intialDelaySeconds: 5
-```
-
-### Setting environment variables
+## Setting environment variables
 
 ```yaml
 apiVersion: apps/v1
@@ -925,7 +879,24 @@ spec:
                   key: myKey
 ```
 
-### Setting normal pod volumes (emptyDir & hostPaths)
+### Using CMD(ARGS) and ENTRYPOINTS(command)
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myos-pod
+  labels:
+    app: myos
+spec:
+  containers:
+    - name: ubuntu
+      image: ubuntu:latest
+      args: ["10"]
+      command: ["sleep2.0"]
+```
+
+## Setting normal pod volumes (emptyDir & hostPaths)
 
 ```yaml
 apiVersion: apps/v1
@@ -1014,7 +985,7 @@ spec:
             claimName: my-pvc
 ```
 
-### Setting replicate set
+## Creating replicate & deamon set
 
 ```yaml
 apiVersion: apps/v1
@@ -1036,7 +1007,54 @@ spec:
           image: nginx:latest
 ```
 
-### Namespaces
+### Setting DaemonSet
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd-elasticsearch
+  namespace: kube-system
+  labels:
+    k8s-app: fluentd-logging
+spec:
+  selector:
+    matchLabels:
+      name: fluentd-elasticsearch
+  template:
+    metadata:
+      labels:
+        name: fluentd-elasticsearch
+    spec:
+      tolerations:
+      # these tolerations are to have the daemonset runnable on control plane nodes
+      # remove them if your control plane nodes should not run pods
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: fluentd-elasticsearch
+        image: quay.io/fluentd_elasticsearch/fluentd:v2.5.2
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+```
+
+## Namespaces
 
 ```yaml
 apiVersion: v1
@@ -1049,8 +1067,8 @@ metadata:
     type: front-end
 spec:
   containers:
-    - name: nginx-container
-      image: nginx
+    - name: nginx
+      image: nginx:latest
 ```
 
 ```yaml
@@ -1061,6 +1079,10 @@ metadata:
   labels:
     name: dev
 ```
+
+## Resource limits
+
+When several users or teams share a cluster with a fixed number of nodes, there is a concern that one team could use more than its fair share of resources. Resource quotas are a tool for administrators to address this concern.
 
 ```yaml
 apiVersion: v1
@@ -1075,4 +1097,361 @@ spec:
     limits.cpu: "2"
     limits.memory: 2Gi
     requests.nvidia.com/gpu: 4
+```
+
+If a container requests a resource, Kubernetes will only schedule it on a node that can give it that resource. Limits, on the other hand, make sure a container never goes above a certain value.
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+    type: front-end
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+      resources:
+        requests:
+          memory: "1Gi"
+          cpu: 1
+        limits: 						
+          memory: "2Gi"
+          cpu: 2
+```
+
+## Selectors via expressions
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchExpressions:
+      - {key: app, operator: In, values: [my-app]}
+      - {key: app, operator: NotIn, values: [first-app, second-app]}
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+```
+
+### Manual scheduling on new Pods
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+    type: front-end
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+  nodeName: worker-node02
+```
+
+### Creating Tolerations and taints
+
+```bash
+kubectl taint nodes worker-node02 app=myapp:NoSchedule
+```
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+    type: front-end
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+  tolerations:
+    - key: "app"
+      operator: "Equal"
+      value: "myapp"
+      effect: "NoSchedule"
+```
+
+### Creating Node selector
+
+```bash
+kubectl label nodes worker-node01 type=SSD
+```
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+    type: front-end
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+  nodeSelector:
+    type: SSD
+```yaml
+
+## Creating Affinities
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+    type: front-end
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+            - key: type
+              operator: In
+              values:
+                - SSD
+                - RAM
+```
+
+## Additional configurations (Liveness Probe and Image Pull Policy)
+
+- on any change the image will be repulled
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchExpressions:
+      - {key: app, operator: In, values: [my-app]}
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+      imagePullPolicy: Always
+      livenessProbe:
+        httpGet:
+          path / 						
+          port: 8080 					
+          httpHeaders: Authorization 	
+        periodSeconds: 10
+        intialDelaySeconds: 5
+```
+
+### Merging config files via '---'
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: my-app
+  ports:
+    - protocol: 'TCP'
+      port: 123
+      targetPort: 80
+      nodePort: 30200
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+```
+
+## Security
+
+```bash
+openssl genrsa -out bence.key 2048
+openssl req -new -key bence.key -out bence.csr
+
+export BASE64_CSR=$(cat ./bence.csr | base64 | tr -d '\n')
+```
+
+### Create K8S CertificateSigningRequest
+
+```yaml
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: bence
+spec:
+  request: ${BASE64_CSR}
+  signerName: kubernetes.io/kube-apiserver-client
+  usages:
+  - client auth
+```yaml
+
+```bash
+cat cert.yaml | envsubst | kubectl apply -f -
+```
+
+```yaml
+kubectl get csr
+kubectl certificate approve bence
+kubectl get csr bence -o yaml
+
+kubectl get csr bence -o jsonpath='{.status.certificate}'| base64 -d > bence.crt
+
+kubectl create ns github
+```
+
+### Create Role
+
+```yaml
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+ namespace: github
+ name: git
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services"]
+  verbs: ["create", "get", "update", "list", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["create", "get", "update", "list", "delete"]
+```
+
+### Create RoleBinding based on user
+
+```yaml
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+ namespace: github
+ name: git
+subjects:
+- kind: User
+  name: bence
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+ kind: Role
+ name: git
+ apiGroup: rbac.authorization.k8s.io
+```
+
+### Create RoleBinding based on group
+
+```yaml
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+ name: git
+ namespace: github
+subjects:
+- kind: Group
+  name: github
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+ kind: Role
+ name: git
+ apiGroup: rbac.authorization.k8s.io
+```
+
+### Adjust KubeConfig
+
+```yaml
+apiVersion: v1
+kind: Config
+preferences: {}
+current-context: bence@local-kubernetes
+clusters:
+- cluster:
+    certificate-authority-data: cat ./ca.crt | base64 | tr -d '\n'
+    server: https://10.0.0.10:6443
+  name: local-kubernetes
+contexts:
+- context:
+    cluster: local-kubernetes
+    namespace: github
+    user: bence
+  name: bence@local-kubernetes
+users:
+- name: bence
+  user:
+    client-certificate-data: cat ./bence.crt | base64 | tr -d '\n'
+    client-key-data: cat ./bence.key | base64 | tr -d '\n'
+```
+
+```bash
+kubectl config view
+kubectl config use-context bence@local-kubernetes
+```
+
+## Creating a Service Account
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+```
+
+### Creating a ClusterRoleBinding
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kubernetes-dashboard
+```
+
+### Getting a Bearer Token
+
+```yaml
+kubectl -n kubernetes-dashboard create token admin-user
 ```
