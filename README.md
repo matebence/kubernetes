@@ -1324,7 +1324,7 @@ spec:
   signerName: kubernetes.io/kube-apiserver-client
   usages:
   - client auth
-```yaml
+```
 
 ```bash
 cat cert.yaml | envsubst | kubectl apply -f -
