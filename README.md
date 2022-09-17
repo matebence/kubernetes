@@ -512,10 +512,11 @@ Tolerations does not tell the pod to go to a particular node. Instead it tells t
 
 ### Affinity
 	
-Two types of Affinity types
+Two types of affinities:
 - During scheduling means it is created the first time
 - During execution means means that if the label is removed from the node the pods are going to ignore it
 
+K8S options:
 - **requiredDuringSchedulingIgnoredDuringExecution** - If there is no label on the node what could match then the pod is not created
 - **preferredDuringSchedulingIgnoredDuringExecution** - If there is no label on the node what could match then the pod is created, but on diff node
 - **requiredDuringSchedulingRequiredDuringExecution** - If there is no label on the node what could match then the pod is not created and if the label is removed from the node the pods gets destroyed
