@@ -968,7 +968,7 @@ spec:
 
 ## ENV CMD ARGS
 
-### environment variables
+### Environment variables
 
 ```yaml
 apiVersion: apps/v1
