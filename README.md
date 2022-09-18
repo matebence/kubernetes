@@ -480,6 +480,13 @@ For pod to pod communication we have two options
 - env: [SERVICE_NAME]_SERVICE_HOST
 - Code DNS: http//service-name.namespace
 
+### Network policies
+
+- Ingress means that traffic flows into a pod (not request/response logic)
+- Egress means that traffic flows out of a pod (not request/response logic)
+
+![Network policies](https://raw.githubusercontent.com/matebence/kubernetes/cert/ingress_egress.png)
+
 ### Volumes
 
 Kubernetes can mount Volumes into Containers. Broad variety of Volumes types (NFS, EFS, CSI):
@@ -597,6 +604,7 @@ kubectl get persistentVolumeClaims
 kubectl get replicasets
 kubectl get namespaces
 kubectl get resourcequotas
+kubectl get ingress
 kubectl describe deployment my-app
 kubectl exec -it my-app -- bash
 kubectl exec my-app -- env
@@ -692,6 +700,8 @@ kubectl apply -f deployment.yaml -f service.yaml
 kubectl delete -f deployment.yaml
 ```
 
+## Most used Objects
+
 ### Pod creation
 
 ```yaml
@@ -706,6 +716,44 @@ spec:
   containers:
     - name: nginx
       image: nginx:latest
+```
+
+### Pod creation - Security Context (Pod Level - all containers)
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+    type: front-end
+spec:
+  securityContext:
+    runAsUser: 1000
+  containers:
+    - name: nginx
+      image: nginx:latest
+```
+
+### Pod creation - Security Context (Container Level - one containers)
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+    type: front-end
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+      securityContext:
+        runAsUser: 1000
+        capabilities:
+          add: ["MAC_ADMIN"]
 ```
 
 ### Deployment creation
@@ -750,6 +798,8 @@ spec:
       maxUnavailable: 0  # maxUnavailable define how many pods can be unavailable
                          # during the rolling update
 ```
+
+## Networking
 
 ### Service creation
 
@@ -822,7 +872,103 @@ spec:
    version: v1.0.0
 ```
 
-## Setting environment variables
+### Network policies
+
+- (matchLabels && namespaceSelector) || (ipBlock[outside k8s]) -> if criterias are met then incoming traffic is allowed
+- (matchLabels && namespaceSelector) || (ipBlock[outside k8s] ) -> if criterias are met then outcoming traffic is allowed
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from: 										
+      - podSelector:
+          matchLabels:
+            name: api-pod
+        namespaceSelector:
+          matchLabels:
+            name: prod
+      - ipBlock:
+          cidr: 192.168.99.10/32
+      ports:
+        - protocol: TCP
+          port: 3306
+  egress:
+    - to: 										
+      - ipBlock:
+          cidr: 192.168.99.10/32
+      ports:
+        - protocol: TCP
+          port: 80
+```
+
+### Ingress (Load balancer)
+
+- https://docs.nginx.com/nginx-ingress-controller/installation/installation-with-manifests/
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: test-ingress
+spec:
+  rules:
+  - host: foo.bar.com
+    http:
+      paths:
+      - path: /pay
+        pathType: Prefix
+        backend:
+          service:
+            name: pay-service
+            port:
+              number: 8282
+```
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: test-ingress
+spec:
+  rules:
+  - host: pay.foo.bar.com
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: pay-service
+            port:
+              number: 8282
+```
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: test-ingress
+spec:
+  defaultBackend:
+    service:
+      name: test
+      port:
+        number: 80
+```
+
+## ENV CMD ARGS
+
+### environment variables
 
 ```yaml
 apiVersion: apps/v1
@@ -897,7 +1043,9 @@ spec:
       command: ["sleep2.0"]
 ```
 
-## Setting normal pod volumes (emptyDir & hostPaths)
+## Storage
+
+### Setting normal pod volumes (emptyDir & hostPaths)
 
 ```yaml
 apiVersion: apps/v1
@@ -986,7 +1134,9 @@ spec:
             claimName: my-pvc
 ```
 
-## Creating replicate & deamon set
+## Listeners
+
+### Creating replicaset
 
 ```yaml
 apiVersion: apps/v1
@@ -1008,7 +1158,7 @@ spec:
           image: nginx:latest
 ```
 
-### Setting DaemonSet
+### Creating DaemonSet
 
 ```yaml
 apiVersion: apps/v1
@@ -1146,6 +1296,8 @@ spec:
           image: nginx:latest
 ```
 
+## Scheduling
+
 ### Manual scheduling on new Pods
 
 ```yaml
@@ -1210,7 +1362,7 @@ spec:
     type: SSD
 ```yaml
 
-## Creating Affinities
+### Creating Affinities
 
 ```yaml
 apiVersion: v1
@@ -1234,74 +1386,6 @@ spec:
               values:
                 - SSD
                 - RAM
-```
-
-## Additional configurations (Liveness Probe and Image Pull Policy)
-
-- on any change the image will be repulled
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: my-app
-spec:
-  selector:
-    matchExpressions:
-      - {key: app, operator: In, values: [my-app]}
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: my-app
-    spec:
-      containers:
-        - name: nginx
-          image: nginx:latest
-      imagePullPolicy: Always
-      livenessProbe:
-        httpGet:
-          path / 						
-          port: 8080 					
-          httpHeaders: Authorization 	
-        periodSeconds: 10
-        intialDelaySeconds: 5
-```
-
-### Merging config files via '---'
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: backend
-spec:
-  selector:
-    app: my-app
-  ports:
-    - protocol: 'TCP'
-      port: 123
-      targetPort: 80
-      nodePort: 30200
-  type: NodePort
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: my-app
-spec:
-  selector:
-    matchLabels:
-      app: my-app
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: my-app
-    spec:
-      containers:
-        - name: nginx
-          image: nginx:latest
 ```
 
 ## Security
@@ -1342,6 +1426,13 @@ kubectl create ns github
 ```
 
 ### Create Role
+
+```bash
+kubectl api-resources --api-group apps -o wide
+kubectl api-resources --api-group "" -o wide
+kubectl api-resources -o wide
+kubectl api-resources
+```
 
 ```yaml
 kind: Role
@@ -1424,7 +1515,7 @@ kubectl config view
 kubectl config use-context bence@local-kubernetes
 ```
 
-## Creating a Service Account
+### Creating a Service Account
 
 ```yaml
 apiVersion: v1
@@ -1455,4 +1546,72 @@ subjects:
 
 ```yaml
 kubectl -n kubernetes-dashboard create token admin-user
+```
+
+## Additional configurations (Liveness Probe and Image Pull Policy)
+
+- on any change the image will be repulled
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchExpressions:
+      - {key: app, operator: In, values: [my-app]}
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+      imagePullPolicy: Always
+      livenessProbe:
+        httpGet:
+          path / 						
+          port: 8080 					
+          httpHeaders: Authorization 	
+        periodSeconds: 10
+        intialDelaySeconds: 5
+```
+
+### Merging config files via '---'
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: my-app
+  ports:
+    - protocol: 'TCP'
+      port: 123
+      targetPort: 80
+      nodePort: 30200
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
 ```
