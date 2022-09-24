@@ -1099,6 +1099,10 @@ spec:
               value: 'test'
 ```
 
+### Configmaps
+
+- For passwod we should use secrets
+
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -1130,6 +1134,24 @@ spec:
                 configMapKeyRef:
                   name: app-config-map
                   key: myKey
+```
+
+### Secrets
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysecret
+type: Opaque
+data:
+  USER_NAME: YWRtaW4=
+  PASSWORD: MWYyZDFlMmU2N2Rm
+```
+
+```bash
+echo -n 'admin' | base64
+echo -n 'as17%#8' | base64 --decode
 ```
 
 ### Using CMD(ARGS) and ENTRYPOINTS(command)
