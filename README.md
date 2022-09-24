@@ -867,6 +867,8 @@ spec:
 
 ## Creating statefulset deployments
 
+- If we want seperate volumes for each deployment then we use volumeClaimTemplates, otherwise just volumes like in deployments
+
 ```yaml
 apiVersion: apps/v1
 kind: StatefulSet
@@ -1017,7 +1019,7 @@ spec:
 
 ### Ingress (Load balancer)
 
-- https://docs.nginx.com/nginx-ingress-controller/installation/installation-with-manifests/
+- [nginx ingress controller](https://docs.nginx.com/nginx-ingress-controller/installation/installation-with-manifests/)
 
 ```yaml
 apiVersion: networking.k8s.io/v1
