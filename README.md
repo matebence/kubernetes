@@ -1,5 +1,9 @@
 # Kubernetes
 
+- [kubernetes-for-beginners](https://github.com/matebence/kubernetes-for-beginners)
+- [kubeadm-scripts](https://github.com/matebence/kubeadm-scripts)
+- [Certified Kubernetes Administrator (CKA) Course](https://github.com/matebence/certified-kubernetes-administrator-course)
+
 ## Installing Google Chrome
 
 ```bash
@@ -391,7 +395,6 @@ spec:
 	- Container to container communication
 	- Its job is to look for new services and everytime a new  service is created it creates the appropriate rules on each node to forward the traffic to services
 
-
 ## Worker node
 
 - Pods are created and managed by Kubernetes (Master node) and placed on the Worker nodes
@@ -480,6 +483,14 @@ For pod to pod communication we have two options
 - env: [SERVICE_NAME]_SERVICE_HOST
 - Code DNS: http//service-name.namespace
 
+Headless services:
+
+- podname.headless-servicename.namespace.svc.cluster-domain.example
+
+- mysql-0.mysql-h.default.svc.cluster.local
+- mysql-1.mysql-h.default.svc.cluster.local
+- mysql-2.mysql-h.default.svc.cluster.local
+
 ### Network policies
 
 - Ingress means that traffic flows into a pod (not request/response logic)
@@ -546,6 +557,54 @@ Patterns for multi container pods:
 - **Adapter** - The Adapter is another pattern that you can implement with multiple containers. The adapter pattern helps you standardise something heterogeneous in nature. For example, you’re running multiple applications within separate containers, but every application has a different way of outputting log files.
 - **Sidecar** - Sidecars derive their name from motorcycle sidecars. While your motorcycle can work fine without the sidecar, having one enhances or extends the functionality of your bike, by giving it an extra seat. Similarly, in Kubernetes, a sidecar pattern is used to enhance or extend the existing functionality of the container.
 
+### High Availability
+
+What happens if there is no master ??
+- The Pods will run, but if they fail then the pod are not restart it
+- Write is called to be successfull when we are able to write to the majority of the nodes
+
+  Majority or 'Querum' = N/2+1
+
+- Where N is the number of nodes
+- And Fault tolerance is Instances - Querum, where the results show how many nodes we can lose
+
+|Instances  |Querum   |Fault Tolerance  |
+|-----------|---------|-----------------|
+|1          |1        |0                |
+|2          |2        |0                |
+|3          |2        |1                |
+|4          |3        |1                |
+|5          |3        |2                |
+|6          |4        |2                |
+|7          |4        |3                |
+
+### Readiness and Liveness Probes
+
+If we create a new pod it will transition from one status to another:
+- **Pending** - kube scheduler is looking for a node where the pod can be placed
+- **ContainerCreating** - image is going to be pulled from the registry and the container is going to be created
+- **Running** - The pod is ready to be used
+
+These status are mapped to conditions under:
+
+```bash
+kubectl describe pod my-pod
+```
+
+- **PodScheduler** - value: TRUE/FALSE
+- **Initiliazed** - value: TRUE/FALSE
+- **ContainersReady** - value: TRUE/FALSE
+- **Ready** - value: TRUE/FALSE
+
+These states can be adjusted with readiness and liveness probes:
+- Where readiness probes means that the pod is successfully created and running
+- And livenesss probes means that k8s is checking periodically if the pod is running if not then it will be restarted
+
+The tests can be:
+- **HTTP** - we call /api/ready of our rest app
+- **TCP** - we check the db port 3306
+- **EXEC CMD** - we execute some linux command
+
 ### Object creation
 
 - Imperatively - command
@@ -605,6 +664,9 @@ kubectl get replicasets
 kubectl get namespaces
 kubectl get resourcequotas
 kubectl get ingress
+kubectl get jobs
+kubectl get cronjobs
+kubectl get statefulsets
 kubectl describe deployment my-app
 kubectl exec -it my-app -- bash
 kubectl exec my-app -- env
@@ -670,6 +732,10 @@ kubectl rollout status deployment my-app
 
 ## backup .yml files
 kubectl get all --all-namespaces -o yaml > all-deploy-services
+
+## set input as json and process with JQ
+## https://www.baeldung.com/linux/jq-command-json
+kubectl get pods -o json | jq '.'
 ```
 
 ## The basics - declaratively approach
@@ -799,6 +865,29 @@ spec:
                          # during the rolling update
 ```
 
+## Creating statefulset deployments
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql-deployment
+spec:
+  serviceName: mysql
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:latest
+```
+
 ## Networking
 
 ### Service creation
@@ -870,6 +959,21 @@ spec:
  selector:
    app: my-app
    version: v1.0.0
+```
+
+### Headless service creation
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+    name: mysql-h
+spec:
+    ports:
+        - port: 3306
+    selector:
+        app: mysql
+    clusterIP: None
 ```
 
 ### Network policies
@@ -1203,6 +1307,49 @@ spec:
       - name: varlog
         hostPath:
           path: /var/log
+```
+
+### Creating Job
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pi
+spec:
+  completions: 3 
+  parallelism: 3
+  template:
+    spec:
+      containers:
+      - name: pi
+        image: perl:5.34.0
+        command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+      restartPolicy: Never
+  backoffLimit: 4
+```
+
+### Creating CronJob
+
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hello
+spec:
+  schedule: "* * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: hello
+            image: busybox:1.28
+            command:
+            - /bin/sh
+            - -c
+            - date; echo Hello from the Kubernetes cluster
+          restartPolicy: OnFailure
 ```
 
 ## Namespaces
@@ -1548,7 +1695,7 @@ subjects:
 kubectl -n kubernetes-dashboard create token admin-user
 ```
 
-## Additional configurations (Liveness Probe and Image Pull Policy)
+## Additional configurations (Liveness & Readiness Probes / Image Pull Policy)
 
 - on any change the image will be repulled
 
@@ -1570,14 +1717,18 @@ spec:
       containers:
         - name: nginx
           image: nginx:latest
-      imagePullPolicy: Always
-      livenessProbe:
-        httpGet:
-          path / 						
-          port: 8080 					
-          httpHeaders: Authorization 	
-        periodSeconds: 10
-        intialDelaySeconds: 5
+          imagePullPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+          readinessProbe:
+            httpGet:
+              path: /api/ready
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 8
 ```
 
 ### Merging config files via '---'
